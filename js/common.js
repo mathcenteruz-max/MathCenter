@@ -1,7 +1,6 @@
-// common.js — MathCenter SPA umumiy modul
-// CDN Firebase modullari + Google OAuth (redirect), profil bootstrap, mc:user-ready
+// common.js — MathCenter umumiy modul (Firebase CDN, Google redirect auth, auto auth modal)
 
-// ==== Firebase SDK (CDN) ====
+// ==== Firebase CDN imports ====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
   getAuth,
@@ -15,48 +14,76 @@ import {
   getFirestore,
   doc, getDoc, setDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-// Analytics (ixtiyoriy)
 import {
   getAnalytics, isSupported as analyticsSupported
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-analytics.js";
 
-// ==== Firebase Config (YANGI PROEKTINGIZ) ====
+// ==== Firebase Config (YANGI PROEKTDAN OLGANINGIZ) ====
 export const firebaseConfig = {
   apiKey: "AIzaSyDpokm9FepnLQhpZADRxZnHtOfggdOnbVk",
   authDomain: "mathcenter-1c98d.firebaseapp.com",
   projectId: "mathcenter-1c98d",
-  storageBucket: "mathcenter-1c98d.appspot.com", // <-- to‘g‘ri domen (appspot.com)
+  storageBucket: "mathcenter-1c98d.appspot.com", // to'g'ri: appspot.com
   messagingSenderId: "1016417719928",
   appId: "1:1016417719928:web:700b028da1312477c87f8d",
   measurementId: "G-JEECME5HMJ"
 };
 
-// ==== Initialize ====
+// ==== Init ====
 export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
 
-// Analytics (agar muhit qo‘llasa)
+// Analytics (ixtiyoriy)
 try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {}
 
-// ==== Admin numeric ID lar ====
+// Admin numeric ID lar
 export const ADMIN_NUMERIC_IDS = [1000001, 1000002];
 
-// ==== Mini DOM util ====
+// === Mini DOM util
 const qs  = (s, el=document) => el.querySelector(s);
 const qsa = (s, el=document) => [...el.querySelectorAll(s)];
 
-// ==== Auth modal helperlari ====
-function showAuthModal() {
-  const m = document.getElementById('authModal');
-  if (m) m.classList.remove('hidden');
+// === AUTH MODAL: auto-inject + helpers
+function ensureAuthModal() {
+  let modal = document.getElementById('authModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'authModal';
+    modal.className = 'modal hidden';
+    modal.innerHTML = `
+      <div class="dialog" style="max-width:420px;margin:10svh auto;padding:14px;border:1px solid #ddd;border-radius:14px;background:#fff">
+        <div class="head" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <h3 style="margin:0">Kirish</h3>
+          <button class="icon-btn" data-close style="font-size:22px;background:none;border:none;cursor:pointer">&times;</button>
+        </div>
+        <div class="body" style="margin-top:8px">
+          <p class="sub">Google orqali tez va xavfsiz kiring</p>
+          <button id="googleLoginBtn" class="btn primary" style="width:100%;padding:10px;border-radius:10px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff">Google bilan kirish</button>
+        </div>
+      </div>
+    `;
+    Object.assign(modal.style, {position:'fixed', inset:'0', background:'rgba(0,0,0,.32)', zIndex: '1000', padding:'10px'});
+    document.body.appendChild(modal);
+  }
+  return modal;
 }
-function hideAuthModal() {
-  const m = document.getElementById('authModal');
-  if (m) m.classList.add('hidden');
+function showAuthModal() { ensureAuthModal().classList.remove('hidden'); }
+function hideAuthModal() { const m = document.getElementById('authModal'); if (m) m.classList.add('hidden'); }
+
+// Login tugmalarini bog'lash (bir marta)
+function bindGoogleButtons(signInHandler){
+  const sels = ['#googleLoginBtn', '.google-signin', '[data-action="signin-google"]'];
+  const btns = sels.flatMap(s => Array.from(document.querySelectorAll(s)));
+  btns.forEach(btn=>{
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', (e)=>{ e.preventDefault(); signInHandler(); });
+    }
+  });
 }
 
-// ==== Foydalanuvchi profilini yaratish/yuklash ====
+// === Foydalanuvchi profilini yaratish/yuklash
 async function getOrCreateUserProfile(user) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
@@ -79,18 +106,18 @@ async function getOrCreateUserProfile(user) {
   return snap.data();
 }
 
-// ==== Global event: mc:user-ready ====
+// === mc:user-ready global event
 function publishUserReady(user, profile) {
   window.__mcUser = { user, profile };
   document.dispatchEvent(new CustomEvent("mc:user-ready", { detail: { user, profile }}));
 }
 
-// ==== Auth UI ====
+// === Auth UI
 /**
  * attachAuthUI({ requireSignIn?: boolean })
- * - Google bilan redirect orqali kirish tugmalarini bog‘laydi
- * - Auth state ni kuzatadi; kirilgach profilni yaratib, mc:user-ready jo‘natadi
- * - requireSignIn=true bo‘lsa, user chiqib turganda #authModal avtomatik ochiladi
+ * - Google redirect authni yoqadi
+ * - User kirgach profilni yaratadi va mc:user-ready jo'natadi
+ * - requireSignIn=true bo'lsa, foydalanuvchi chiqib turganda #authModal avtomatik ochiladi
  *
  * Tugma selectorlari:
  *   - #googleLoginBtn
@@ -99,58 +126,40 @@ function publishUserReady(user, profile) {
  */
 export function attachAuthUI(opts = {}) {
   const provider = new GoogleAuthProvider();
+  const doSignIn = () => signInWithRedirect(auth, provider);
 
-  // 1) Login tugmalarini redirect bilan bog‘lash
-  const bindLoginButtons = () => {
-    const btns = [
-      ...qsa('#googleLoginBtn'),
-      ...qsa('.google-signin'),
-      ...qsa('[data-action="signin-google"]'),
-    ];
-    btns.forEach(btn => {
-      if (btn._bound) return;
-      btn._bound = true;
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        signInWithRedirect(auth, provider);
-      });
-    });
-  };
-  bindLoginButtons();
+  // Redirect natijasini olish (xato bo'lsa ham yutamiz — bekor qilish normal)
+  getRedirectResult(auth).catch(()=>{});
 
-  // 2) Redirect natijasi (agar qaytgan bo‘lsa)
-  getRedirectResult(auth).catch(err => {
-    // Ba’zida bekor qilish normal: auth/cancelled-popup-request va h.k.
-    if (err?.code) console.warn('[auth] redirect result:', err.code);
-  });
-
-  // 3) Auth holati
+  // Auth holatini kuzatish
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       try {
         const profile = await getOrCreateUserProfile(user);
         publishUserReady(user, profile);
-        hideAuthModal(); // kirdi — modalni yopamiz
+        hideAuthModal(); // kirdi — modal yopilsin
       } catch (e) {
         console.error('[auth] profile error:', e);
         alert('Profilni yuklashda xato: ' + (e.message || e));
       }
     } else {
-      if (opts.requireSignIn) {
-        showAuthModal(); // foydalanuvchi chiqib turgan — kirish oynasini ko‘rsatamiz
-      }
-      // tugmalar doim faol bo‘lsin
-      bindLoginButtons();
+      // User chiqib turgan holat
+      if (opts.requireSignIn) showAuthModal();
+      // Tugmalarni har safar ishonch uchun bog'lab qo'yamiz (modal hozirgina yarattilgan bo'lishi mumkin)
+      bindGoogleButtons(doSignIn);
     }
   });
+
+  // Dastlab ham tugmalarni bog'lab qo'yamiz
+  bindGoogleButtons(doSignIn);
 }
 
-// ==== UX umumiy ====
+// === UX umumiy
 /**
  * initUX()
- * - Chiqish tugmasi: [data-action="signout"]
- * - (Ixtiyoriy) Kirish tugmasi fallback: [data-action="signin-google"]
- * - [data-open="modalId"] bo‘lsa, modalni ochish (agar siz modal tizimini shu tarzda ishlatsangiz)
+ * - [data-action="signout"] chiqish
+ * - [data-action="signin-google"] fallback
+ * - [data-open="modalId"] / [data-close] modal boshqaruvi
  */
 export function initUX() {
   // Chiqish
@@ -163,7 +172,7 @@ export function initUX() {
     });
   });
 
-  // Kirish fallback
+  // Kirish fallback (agar sahifada alohida tugma bo'lsa)
   qsa('[data-action="signin-google"]').forEach(btn => {
     if (btn._bound) return;
     btn._bound = true;
@@ -174,7 +183,7 @@ export function initUX() {
     });
   });
 
-  // Oddiy modal ochish (agar HTML’da [data-open] ishlatsangiz)
+  // Oddiy modal boshqaruvi
   document.addEventListener('click', (e) => {
     const openId = e.target?.getAttribute?.('data-open');
     if (openId) {
@@ -190,7 +199,7 @@ export function initUX() {
   });
 }
 
-// === (ixtiyoriy) kichik helper: adminligini sinxron tekshirish
+// === (ixtiyoriy) adminligini sinxron tekshirish
 export const isAdminSync = () => {
   const prof = window.__mcUser?.profile;
   const num = Number(prof?.numericId);
