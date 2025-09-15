@@ -1,168 +1,200 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+// common.js — MathCenter (mathcenter-1c98d) uchun
+// Firebase CDN + Google redirect auth + auto auth modal
 
-/* =====================
- *  Firebase bootstrap
- * ===================== */
+// ==== Firebase CDN imports ====
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  getFirestore,
+  doc, getDoc, setDoc, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import {
+  getAnalytics, isSupported as analyticsSupported
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-analytics.js";
+
+// ==== Firebase Config (MathCenter) ====
 export const firebaseConfig = {
-  apiKey: "AIzaSyDYwHJou_9GqHZcf8XxtTByC51Z8un8rrM",
-  authDomain: "xplusy-760fa.firebaseapp.com",
-  projectId: "xplusy-760fa",
-  storageBucket: "xplusy-760fa.appspot.com",
-  messagingSenderId: "992512966017",
-  appId: "1:992512966017:web:5e919dbc9b8d8abcb43c80",
-  measurementId: "G-459PLJ7P7L"
+  apiKey: "AIzaSyDpokm9FepnLQhpZADRxZnHtOfggdOnbVk",
+  authDomain: "mathcenter-1c98d.firebaseapp.com",
+  projectId: "mathcenter-1c98d",
+  // MUHIM: storageBucket .appspot.com bo'lishi kerak
+  storageBucket: "mathcenter-1c98d.appspot.com",
+  messagingSenderId: "1016417719928",
+  appId: "1:1016417719928:web:700b028da1312477c87f8d",
+  measurementId: "G-JEECME5HMJ"
 };
 
+// ==== Init ====
+export const app  = initializeApp(firebaseConfig);
+export const db   = getFirestore(app);
+export const auth = getAuth(app);
+
+// Analytics (ixtiyoriy)
+try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {}
+
+// Admin numeric ID lar (ixtiyoriy)
 export const ADMIN_NUMERIC_IDS = [1000001, 1000002];
 
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// === Mini DOM util
+const qs  = (s, el=document) => el.querySelector(s);
+const qsa = (s, el=document) => [...el.querySelectorAll(s)];
 
-/* =====================
- *  Theme: FORCE LIGHT ONLY
- * ===================== */
-function applyLight(){
-  // Force UA widgets + colors to light
-  document.documentElement.style.colorScheme = 'light';
-  // Keep compatibility with any old styles relying on .theme-light
-  document.body.classList.add('theme-light');
-  // Remove any stored theme state from older builds
-  try { localStorage.removeItem('mc_theme'); } catch {}
-  // If there was a theme toggle button in markup, hide it gracefully
-  const btn = document.querySelector('#btnTheme');
-  if (btn){ btn.style.display = 'none'; }
-}
-export function initTheme(){ applyLight(); }
-
-/* =====================
- *  Bottom bar cleanup
- * ===================== */
-export function ensureBottomBar(){
-  document.querySelectorAll('.bottom-bar').forEach(el => { el.style.display = 'none'; });
-}
-
-/* =====================
- *  Auth + Header pills
- * ===================== */
-async function ensureUserDoc(uid, profile){
-  const ref = doc(db, 'users', uid);
-  const snap = await getDoc(ref);
-  if(!snap.exists()){
-    await setDoc(ref, {
-      uid,
-      email: profile.email || null,
-      displayName: profile.displayName || null,
-      createdAt: serverTimestamp(),
-      numericId: null,
-      firstName:'', lastName:'', middleName:'', dob:'', region:'', district:'', phone:'',
-      balance:0, gems:0, badges:[]
-    });
+// === AUTH MODAL: auto-inject + helpers
+function ensureAuthModal() {
+  let modal = document.getElementById('authModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'authModal';
+    modal.className = 'modal hidden';
+    modal.innerHTML = `
+      <div class="dialog" style="max-width:420px;margin:10svh auto;padding:14px;border:1px solid #ddd;border-radius:14px;background:#fff">
+        <div class="head" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <h3 style="margin:0">Kirish</h3>
+          <button class="icon-btn" data-close style="font-size:22px;background:none;border:none;cursor:pointer">&times;</button>
+        </div>
+        <div class="body" style="margin-top:8px">
+          <p class="sub">Google orqali tez va xavfsiz kiring</p>
+          <button id="googleLoginBtn" class="btn primary" style="width:100%;padding:10px;border-radius:10px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff">Google bilan kirish</button>
+        </div>
+      </div>
+    `;
+    Object.assign(modal.style, {position:'fixed', inset:'0', background:'rgba(0,0,0,.32)', zIndex: '1000', padding:'10px'});
+    document.body.appendChild(modal);
   }
-  return (await getDoc(ref)).data();
+  return modal;
+}
+function showAuthModal() { ensureAuthModal().classList.remove('hidden'); }
+function hideAuthModal() { const m = document.getElementById('authModal'); if (m) m.classList.add('hidden'); }
+
+// Login tugmalarini bog'lash (bir marta) — :contentReference[oaicite:1]{index=1}
+function bindGoogleButtons(signInHandler){
+  const sels = ['#googleLoginBtn', '.google-signin', '[data-action="signin-google"]'];
+  const btns = sels.flatMap(s => Array.from(document.querySelectorAll(s)));
+  btns.forEach(btn=>{
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', (e)=>{ e.preventDefault(); signInHandler(); });
+    }
+  });
 }
 
-/** Attach auth UI parts to header + overlay (Google sign-in) */
-export function attachAuthUI({ requireSignIn = true } = {}){
-  const idEl  = ()=> document.querySelector('#hdrId');
-  const balEl = ()=> document.querySelector('#hdrBal');
-  const gemEl = ()=> document.querySelector('#hdrGem');
-  const btnIn = ()=> document.querySelector('#btnSignIn');
-  const btnOut= ()=> document.querySelector('#btnSignOut');
+// === Foydalanuvchi profilini yaratish/yuklash — :contentReference[oaicite:2]{index=2}
+async function getOrCreateUserProfile(user) {
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    const profile = {
+      uid: user.uid,
+      email: user.email || null,
+      firstName: user.displayName?.split(" ")?.[0] || "",
+      lastName:  user.displayName?.split(" ")?.slice(1).join(" ") || "",
+      phone: user.phoneNumber || "",
+      numericId: null,
+      balance: 0,
+      gems: 0,
+      createdAtFS: serverTimestamp(),
+      updatedAtFS: serverTimestamp(),
+    };
+    await setDoc(ref, profile, { merge: true });
+    return (await getDoc(ref)).data();
+  }
+  return snap.data();
+}
 
-  onAuthStateChanged(auth, async (user)=>{
-    if(!user){
-      btnIn()?.classList.remove('hidden');
-      btnOut()?.classList.add('hidden');
-      idEl()  && (idEl().textContent='ID: —');
-      balEl() && (balEl().textContent='💵 0');
-      gemEl() && (gemEl().textContent='💎 0');
-      if(requireSignIn){
-        let o=document.querySelector('#authOverlay');
-        if(!o){
-          o=document.createElement('div');
-          o.id='authOverlay'; o.className='modal';
-          o.innerHTML=`<div class="dialog" role="dialog" aria-modal="true">
-              <div class="head"><h3 style="margin:0">Kirish</h3></div>
-              <div class="body">
-                <p class="sub">Google orqali tez va xavfsiz kiring</p>
-              </div>
-              <div class="foot">
-                <button id="overlaySignIn" class="btn primary">Google bilan kirish</button>
-              </div>
-            </div>`;
-          document.body.appendChild(o);
-          o.addEventListener('click', (e)=>{ if(e.target===o) o.remove(); });
-          document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ o?.remove(); }});
-          o.querySelector('#overlaySignIn').addEventListener('click', async ()=>{
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider).catch(e=> alert('Kirish xatosi: '+e.message));
-          });
-        }
+// === mc:user-ready global event — :contentReference[oaicite:3]{index=3}
+function publishUserReady(user, profile) {
+  window.__mcUser = { user, profile };
+  document.dispatchEvent(new CustomEvent("mc:user-ready", { detail: { user, profile }}));
+}
+
+// === Auth UI — :contentReference[oaicite:4]{index=4}
+export function attachAuthUI(opts = {}) {
+  const provider = new GoogleAuthProvider();
+  const doSignIn = () => signInWithRedirect(auth, provider);
+
+  // Redirect natijasini olish (xatoni ko'rsatamiz)
+  getRedirectResult(auth)
+    .then((cred) => {
+      if (cred?.user) console.log('[auth] redirect OK:', cred.user.uid);
+    })
+    .catch((e) => {
+      console.warn('[auth] redirect error:', e);
+      alert('Kirish xatosi: ' + (e.code || e.message || e));
+    });
+
+  // Auth holatini kuzatish
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      try {
+        const profile = await getOrCreateUserProfile(user);
+        publishUserReady(user, profile);
+        hideAuthModal(); // kirdi — modal yopilsin
+      } catch (e) {
+        console.error('[auth] profile error:', e);
+        alert('Profilni yuklashda xato: ' + (e.message || e));
       }
-      return;
-    }
-    document.querySelector('#authOverlay')?.remove();
-    const profile = await ensureUserDoc(user.uid, user);
-    btnIn()?.classList.add('hidden');
-    btnOut()?.classList.remove('hidden');
-    idEl()  && (idEl().textContent='ID: '+(profile.numericId ?? '—'));
-    balEl() && (balEl().textContent='💵 '+(profile.balance ?? 0));
-    gemEl() && (gemEl().textContent='💎 '+(profile.gems ?? 0));
-    window.__mcUser = { user, profile };
-    document.dispatchEvent(new CustomEvent('mc:user-ready', { detail: window.__mcUser }));
-  });
-
-  document.addEventListener('click', async (e)=>{
-    if(e.target && (e.target.id==='btnSignIn' || e.target.matches('[data-action="signin"]'))){
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider).catch(err=> alert('Kirish xatosi: '+err.message));
-    }
-    if(e.target && (e.target.id==='btnSignOut' || e.target.matches('[data-action="signout"]'))){
-      await signOut(auth).catch(err=> alert('Chiqishda xato: '+err.message));
-      location.reload();
+    } else {
+      if (opts.requireSignIn) showAuthModal();  // chiqib turganda modal
+      bindGoogleButtons(doSignIn);              // tugmalarni bog'lash
     }
   });
+
+  // Dastlab ham tugmalarni bog'lab qo'yamiz
+  bindGoogleButtons(doSignIn);
 }
 
-/* =====================
- *  Page-level UX init
- * ===================== */
+// === UX umumiy — :contentReference[oaicite:5]{index=5}
+export function initUX() {
+  // Chiqish
+  qsa('[data-action="signout"]').forEach(btn => {
+    if (btn._bound) return;
+    btn._bound = true;
+    btn.addEventListener('click', async () => {
+      try { await signOut(auth); location.reload(); }
+      catch (e) { alert('Chiqishda xato: ' + (e.message || e)); }
+    });
+  });
 
-/* Active nav state */
-function __mcUpdateActiveNav(){
-  const hash = location.hash || '#home';
-  document.querySelectorAll('.nav.desktop-nav a').forEach(a=>{
-    const href = a.getAttribute('href')||'';
-    if(!href.startsWith('#')) return a.classList.remove('active');
-    a.classList.toggle('active', href === hash);
+  // Kirish fallback (agar sahifada alohida tugma bo'lsa)
+  qsa('[data-action="signin-google"]').forEach(btn => {
+    if (btn._bound) return;
+    btn._bound = true;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const p = new GoogleAuthProvider();
+      signInWithRedirect(auth, p);
+    });
+  });
+
+  // Oddiy modal boshqaruvi
+  document.addEventListener('click', (e) => {
+    const openId = e.target?.getAttribute?.('data-open');
+    if (openId) {
+      const m = document.getElementById(openId);
+      if (m) m.classList.remove('hidden');
+    }
+    if (e.target?.hasAttribute?.('data-close')) {
+      e.target.closest('.modal')?.classList?.add('hidden');
+    }
+    if (e.target?.classList?.contains('modal')) {
+      e.target.classList.add('hidden');
+    }
   });
 }
-window.addEventListener('hashchange', __mcUpdateActiveNav, { passive:true });
 
-export function initUX(){
-  initTheme();
-  ensureBottomBar();
-  document.documentElement.classList.add('js-ready');
-  __mcUpdateActiveNav();
-}
-/* === Lightweight 3D tilt for modern feel === */
-function enableTilt(sel){
-  const nodes = document.querySelectorAll(sel);
-  nodes.forEach(el=>{
-    el.style.transformStyle = 'preserve-3d';
-    el.addEventListener('mousemove', (e)=>{
-      const r = el.getBoundingClientRect();
-      const cx = r.left + r.width/2, cy = r.top + r.height/2;
-      const dx = (e.clientX - cx) / (r.width/2);
-      const dy = (e.clientY - cy) / (r.height/2);
-      el.style.transform = `perspective(600px) rotateX(${(-dy*5).toFixed(2)}deg) rotateY(${(dx*5).toFixed(2)}deg) translateZ(6px)`;
-    }, {passive:true});
-    el.addEventListener('mouseleave', ()=>{ el.style.transform = 'perspective(600px) translateZ(0)'; });
-  });
-}
-document.addEventListener('DOMContentLoaded', ()=>{
-  enableTilt('.nav.desktop-nav a, .btn, .lb-row, .scard, .eh-card');
-});
+// === (ixtiyoriy) adminligini sinxron tekshirish — :contentReference[oaicite:6]{index=6}
+export const isAdminSync = () => {
+  const prof = window.__mcUser?.profile;
+  const num = Number(prof?.numericId);
+  return Number.isFinite(num) && ADMIN_NUMERIC_IDS.includes(num);
+};
+
+// === Konsol banner (debug)
+try { console.log('%cMathCenter common.js loaded', 'color:#0ea5e9;font-weight:bold'); } catch {}
