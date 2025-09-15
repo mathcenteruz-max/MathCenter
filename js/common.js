@@ -1,5 +1,5 @@
 // common.js — MathCenter (mathcenter-1c98d) uchun
-// Firebase CDN + Google redirect auth + auto auth modal
+// Firebase CDN + Google Redirect Auth + Auto Modal + Barqaror Sessiya
 
 // ==== Firebase CDN imports ====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -10,6 +10,8 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signOut,
+  setPersistence,
+  browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
   getFirestore,
@@ -24,17 +26,22 @@ export const firebaseConfig = {
   apiKey: "AIzaSyDpokm9FepnLQhpZADRxZnHtOfggdOnbVk",
   authDomain: "mathcenter-1c98d.firebaseapp.com",
   projectId: "mathcenter-1c98d",
-  // MUHIM: storageBucket .appspot.com bo'lishi kerak
-  storageBucket: "mathcenter-1c98d.appspot.com",
+  storageBucket: "mathcenter-1c98d.appspot.com", // MUHIM: appspot.com
   messagingSenderId: "1016417719928",
   appId: "1:1016417719928:web:700b028da1312477c87f8d",
-  measurementId: "G-JEECME5HMJ"
+  measurementId: "G-JEECME5HMJ",
 };
 
 // ==== Init ====
 export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
+
+// Sessiya qat'iy saqlansin (redirectdan keyin ham turib qolsin)
+setPersistence(auth, browserLocalPersistence).catch(e=>{
+  console.warn("[auth] setPersistence error:", e);
+});
+auth.useDeviceLanguage?.();
 
 // Analytics (ixtiyoriy)
 try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {}
@@ -43,16 +50,16 @@ try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {
 export const ADMIN_NUMERIC_IDS = [1000001, 1000002];
 
 // === Mini DOM util
-const qs  = (s, el=document) => el.querySelector(s);
-const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+const q  = (s, el=document) => el.querySelector(s);
+const qa = (s, el=document) => [...el.querySelectorAll(s)];
 
 // === AUTH MODAL: auto-inject + helpers
 function ensureAuthModal() {
-  let modal = document.getElementById('authModal');
+  let modal = document.getElementById("authModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'authModal';
-    modal.className = 'modal hidden';
+    modal = document.createElement("div");
+    modal.id = "authModal";
+    modal.className = "modal hidden";
     modal.innerHTML = `
       <div class="dialog" style="max-width:420px;margin:10svh auto;padding:14px;border:1px solid #ddd;border-radius:14px;background:#fff">
         <div class="head" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -60,34 +67,36 @@ function ensureAuthModal() {
           <button class="icon-btn" data-close style="font-size:22px;background:none;border:none;cursor:pointer">&times;</button>
         </div>
         <div class="body" style="margin-top:8px">
-          <p class="sub">Google orqali tez va xavfsiz kiring</p>
-          <button id="googleLoginBtn" class="btn primary" style="width:100%;padding:10px;border-radius:10px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff">Google bilan kirish</button>
+          <p class="sub" style="margin:0 0 8px">Google orqali tez va xavfsiz kiring</p>
+          <button id="googleLoginBtn" class="btn primary" style="width:100%;padding:10px;border-radius:10px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff">
+            Google bilan kirish
+          </button>
         </div>
       </div>
     `;
-    Object.assign(modal.style, {position:'fixed', inset:'0', background:'rgba(0,0,0,.32)', zIndex: '1000', padding:'10px'});
+    Object.assign(modal.style, { position:"fixed", inset:"0", background:"rgba(0,0,0,.32)", zIndex:"1000", padding:"10px" });
     document.body.appendChild(modal);
   }
   return modal;
 }
-function showAuthModal() { ensureAuthModal().classList.remove('hidden'); }
-function hideAuthModal() { const m = document.getElementById('authModal'); if (m) m.classList.add('hidden'); }
+function showAuthModal() { ensureAuthModal().classList.remove("hidden"); }
+function hideAuthModal() { const m = document.getElementById("authModal"); if (m) m.classList.add("hidden"); }
 
-// Login tugmalarini bog'lash (bir marta) — :contentReference[oaicite:1]{index=1}
-function bindGoogleButtons(signInHandler){
-  const sels = ['#googleLoginBtn', '.google-signin', '[data-action="signin-google"]'];
+// Login tugmalarini bog'lash (bir marta)
+function bindGoogleButtons(handler){
+  const sels = ["#googleLoginBtn", ".google-signin", "[data-action='signin-google']"];
   const btns = sels.flatMap(s => Array.from(document.querySelectorAll(s)));
-  btns.forEach(btn=>{
+  btns.forEach(btn => {
     if (btn && !btn._bound) {
       btn._bound = true;
-      btn.addEventListener('click', (e)=>{ e.preventDefault(); signInHandler(); });
+      btn.addEventListener("click", (e)=>{ e.preventDefault(); handler(); });
     }
   });
 }
 
-// === Foydalanuvchi profilini yaratish/yuklash — :contentReference[oaicite:2]{index=2}
+// === Foydalanuvchi profilini yaratish/yuklash
 async function getOrCreateUserProfile(user) {
-  const ref = doc(db, "users", user.uid);
+  const ref  = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
     const profile = {
@@ -108,93 +117,111 @@ async function getOrCreateUserProfile(user) {
   return snap.data();
 }
 
-// === mc:user-ready global event — :contentReference[oaicite:3]{index=3}
+// === mc:user-ready global event
 function publishUserReady(user, profile) {
   window.__mcUser = { user, profile };
-  document.dispatchEvent(new CustomEvent("mc:user-ready", { detail: { user, profile }}));
+  document.dispatchEvent(new CustomEvent("mc:user-ready", { detail: { user, profile } }));
 }
 
-// === Auth UI — :contentReference[oaicite:4]{index=4}
+// === Auth UI
+/**
+ * attachAuthUI({ requireSignIn?: boolean })
+ * - Google redirect authni yoqadi
+ * - User kirgach profilni yaratadi va mc:user-ready jo'natadi
+ * - requireSignIn=true bo'lsa, foydalanuvchi chiqib turganda #authModal avtomatik ochiladi
+ */
 export function attachAuthUI(opts = {}) {
   const provider = new GoogleAuthProvider();
-  const doSignIn = () => signInWithRedirect(auth, provider);
+  provider.setCustomParameters({ prompt: "select_account" });
 
-  // Redirect natijasini olish (xatoni ko'rsatamiz)
+  const doRedirectSignIn = () => signInWithRedirect(auth, provider);
+
+  // Redirect natijasini ko'rish (xato bo'lsa ko'rsatamiz)
   getRedirectResult(auth)
     .then((cred) => {
-      if (cred?.user) console.log('[auth] redirect OK:', cred.user.uid);
+      if (cred?.user) console.log("[auth] redirect OK:", cred.user.uid, cred.user.email);
     })
     .catch((e) => {
-      console.warn('[auth] redirect error:', e);
-      alert('Kirish xatosi: ' + (e.code || e.message || e));
+      console.error("[auth] redirect error:", e);
+      alert("Kirish xatosi: " + (e.code || e.message || e));
     });
 
   // Auth holatini kuzatish
   onAuthStateChanged(auth, async (user) => {
+    console.log("[auth] state:", !!user, user?.email || "");
     if (user) {
       try {
         const profile = await getOrCreateUserProfile(user);
         publishUserReady(user, profile);
         hideAuthModal(); // kirdi — modal yopilsin
       } catch (e) {
-        console.error('[auth] profile error:', e);
-        alert('Profilni yuklashda xato: ' + (e.message || e));
+        console.error("[auth] profile error:", e);
+        alert("Profilni yuklashda xato: " + (e.message || e));
       }
     } else {
-      if (opts.requireSignIn) showAuthModal();  // chiqib turganda modal
-      bindGoogleButtons(doSignIn);              // tugmalarni bog'lash
+      // User chiqib turgan holat
+      if (opts.requireSignIn) showAuthModal();
+      // Har safar ishonch uchun tugmalarni bog'lab qo'yamiz
+      bindGoogleButtons(doRedirectSignIn);
     }
   });
 
   // Dastlab ham tugmalarni bog'lab qo'yamiz
-  bindGoogleButtons(doSignIn);
+  bindGoogleButtons(doRedirectSignIn);
 }
 
-// === UX umumiy — :contentReference[oaicite:5]{index=5}
+// === UX umumiy
+/**
+ * initUX()
+ * - [data-action="signout"] chiqish
+ * - [data-action="signin-google"] fallback (agar alohida tugma bo'lsa)
+ * - [data-open="modalId"] / [data-close] modal boshqaruvi
+ */
 export function initUX() {
   // Chiqish
-  qsa('[data-action="signout"]').forEach(btn => {
+  qa("[data-action='signout']").forEach(btn => {
     if (btn._bound) return;
     btn._bound = true;
-    btn.addEventListener('click', async () => {
+    btn.addEventListener("click", async () => {
       try { await signOut(auth); location.reload(); }
-      catch (e) { alert('Chiqishda xato: ' + (e.message || e)); }
+      catch (e) { alert("Chiqishda xato: " + (e.message || e)); }
     });
   });
 
-  // Kirish fallback (agar sahifada alohida tugma bo'lsa)
-  qsa('[data-action="signin-google"]').forEach(btn => {
+  // Kirish fallback (alohida tugmalar uchun)
+  qa("[data-action='signin-google']").forEach(btn => {
     if (btn._bound) return;
     btn._bound = true;
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener("click", (e) => {
       e.preventDefault();
       const p = new GoogleAuthProvider();
+      p.setCustomParameters({ prompt: "select_account" });
       signInWithRedirect(auth, p);
     });
   });
 
   // Oddiy modal boshqaruvi
-  document.addEventListener('click', (e) => {
-    const openId = e.target?.getAttribute?.('data-open');
+  document.addEventListener("click", (e) => {
+    const openId = e.target?.getAttribute?.("data-open");
     if (openId) {
       const m = document.getElementById(openId);
-      if (m) m.classList.remove('hidden');
+      if (m) m.classList.remove("hidden");
     }
-    if (e.target?.hasAttribute?.('data-close')) {
-      e.target.closest('.modal')?.classList?.add('hidden');
+    if (e.target?.hasAttribute?.("data-close")) {
+      e.target.closest(".modal")?.classList?.add("hidden");
     }
-    if (e.target?.classList?.contains('modal')) {
-      e.target.classList.add('hidden');
+    if (e.target?.classList?.contains("modal")) {
+      e.target.classList.add("hidden");
     }
   });
 }
 
-// === (ixtiyoriy) adminligini sinxron tekshirish — :contentReference[oaicite:6]{index=6}
+// === (ixtiyoriy) adminligini sinxron tekshirish
 export const isAdminSync = () => {
   const prof = window.__mcUser?.profile;
-  const num = Number(prof?.numericId);
+  const num  = Number(prof?.numericId);
   return Number.isFinite(num) && ADMIN_NUMERIC_IDS.includes(num);
 };
 
 // === Konsol banner (debug)
-try { console.log('%cMathCenter common.js loaded', 'color:#0ea5e9;font-weight:bold'); } catch {}
+try { console.log("%cMathCenter common.js loaded", "color:#0ea5e9;font-weight:bold"); } catch {}

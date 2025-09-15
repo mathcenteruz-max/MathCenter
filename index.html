@@ -106,5 +106,10 @@
       }
     });
   </script>
+  <script type="module">
+  import { attachAuthUI, initUX } from './js/common.js';
+  attachAuthUI({ requireSignIn: true });
+  initUX();
+</script>
 </body>
 </html>
