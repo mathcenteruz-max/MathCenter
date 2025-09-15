@@ -1,4 +1,5 @@
-// common.js — MathCenter SPA umumiy modul (CDN imports, Google redirect auth, Firestore)
+// common.js — MathCenter SPA umumiy modul
+// CDN Firebase modullari + Google OAuth (redirect), profil bootstrap, mc:user-ready
 
 // ==== Firebase SDK (CDN) ====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -14,12 +15,12 @@ import {
   getFirestore,
   doc, getDoc, setDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-// Analytics (ixtiyoriy; brauzer qo‘llasa ishga tushadi)
+// Analytics (ixtiyoriy)
 import {
   getAnalytics, isSupported as analyticsSupported
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-analytics.js";
 
-// ==== Firebase Config ====
+// ==== Firebase Config (YANGI PROEKTINGIZ) ====
 export const firebaseConfig = {
   apiKey: "AIzaSyDpokm9FepnLQhpZADRxZnHtOfggdOnbVk",
   authDomain: "mathcenter-1c98d.firebaseapp.com",
@@ -35,17 +36,27 @@ export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
 
-// Analytics (agar qurilma qo‘llasa)
+// Analytics (agar muhit qo‘llasa)
 try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {}
 
 // ==== Admin numeric ID lar ====
 export const ADMIN_NUMERIC_IDS = [1000001, 1000002];
 
-// ==== Ichki util ====
+// ==== Mini DOM util ====
 const qs  = (s, el=document) => el.querySelector(s);
 const qsa = (s, el=document) => [...el.querySelectorAll(s)];
 
-// Foydalanuvchi hujjatini yaratish/yuklash
+// ==== Auth modal helperlari ====
+function showAuthModal() {
+  const m = document.getElementById('authModal');
+  if (m) m.classList.remove('hidden');
+}
+function hideAuthModal() {
+  const m = document.getElementById('authModal');
+  if (m) m.classList.add('hidden');
+}
+
+// ==== Foydalanuvchi profilini yaratish/yuklash ====
 async function getOrCreateUserProfile(user) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
@@ -68,7 +79,7 @@ async function getOrCreateUserProfile(user) {
   return snap.data();
 }
 
-// Global holat + event
+// ==== Global event: mc:user-ready ====
 function publishUserReady(user, profile) {
   window.__mcUser = { user, profile };
   document.dispatchEvent(new CustomEvent("mc:user-ready", { detail: { user, profile }}));
@@ -78,8 +89,8 @@ function publishUserReady(user, profile) {
 /**
  * attachAuthUI({ requireSignIn?: boolean })
  * - Google bilan redirect orqali kirish tugmalarini bog‘laydi
- * - auth state ni kuzatadi, kerak bo‘lsa profilni yaratadi
- * - kirilgandan so‘ng `mc:user-ready` eventini chiqaradi
+ * - Auth state ni kuzatadi; kirilgach profilni yaratib, mc:user-ready jo‘natadi
+ * - requireSignIn=true bo‘lsa, user chiqib turganda #authModal avtomatik ochiladi
  *
  * Tugma selectorlari:
  *   - #googleLoginBtn
@@ -89,7 +100,7 @@ function publishUserReady(user, profile) {
 export function attachAuthUI(opts = {}) {
   const provider = new GoogleAuthProvider();
 
-  // 1) Tugmalarni bog‘lash (redirect varianti — popup muammosiz)
+  // 1) Login tugmalarini redirect bilan bog‘lash
   const bindLoginButtons = () => {
     const btns = [
       ...qsa('#googleLoginBtn'),
@@ -107,30 +118,29 @@ export function attachAuthUI(opts = {}) {
   };
   bindLoginButtons();
 
-  // 2) Redirect natijasini olish (agar mavjud bo‘lsa)
+  // 2) Redirect natijasi (agar qaytgan bo‘lsa)
   getRedirectResult(auth).catch(err => {
-    // Ba’zi hollarda cancel bo‘lishi normal (auth/cancelled-popup-request va h.k.)
-    console.warn('[auth] redirect result error:', err?.code || err);
+    // Ba’zida bekor qilish normal: auth/cancelled-popup-request va h.k.
+    if (err?.code) console.warn('[auth] redirect result:', err.code);
   });
 
-  // 3) Auth holatini kuzatish
+  // 3) Auth holati
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // Profilni yaratish/yuklash
       try {
         const profile = await getOrCreateUserProfile(user);
         publishUserReady(user, profile);
+        hideAuthModal(); // kirdi — modalni yopamiz
       } catch (e) {
         console.error('[auth] profile error:', e);
         alert('Profilni yuklashda xato: ' + (e.message || e));
       }
     } else {
-      // Agar requireSignIn bo‘lsa — login modal/tugmasini ko‘rsatish lozim
       if (opts.requireSignIn) {
-        // Sizning interfeysga mos ravishda “Kirish” oynasini ko‘rsatish mumkin.
-        // Bu yerda faqat tugmalarni qayta bog‘laymiz:
-        bindLoginButtons();
+        showAuthModal(); // foydalanuvchi chiqib turgan — kirish oynasini ko‘rsatamiz
       }
+      // tugmalar doim faol bo‘lsin
+      bindLoginButtons();
     }
   });
 }
@@ -139,7 +149,8 @@ export function attachAuthUI(opts = {}) {
 /**
  * initUX()
  * - Chiqish tugmasi: [data-action="signout"]
- * - Kirish tugmasi fallback: [data-action="signin-google"] (agar attachAuthUI chaqirilmagan bo‘lsa)
+ * - (Ixtiyoriy) Kirish tugmasi fallback: [data-action="signin-google"]
+ * - [data-open="modalId"] bo‘lsa, modalni ochish (agar siz modal tizimini shu tarzda ishlatsangiz)
  */
 export function initUX() {
   // Chiqish
@@ -152,7 +163,7 @@ export function initUX() {
     });
   });
 
-  // Agar sahifada kirish tugmasi bo‘lsa — kamida handler bo‘lsin
+  // Kirish fallback
   qsa('[data-action="signin-google"]').forEach(btn => {
     if (btn._bound) return;
     btn._bound = true;
@@ -162,16 +173,29 @@ export function initUX() {
       signInWithRedirect(auth, p);
     });
   });
+
+  // Oddiy modal ochish (agar HTML’da [data-open] ishlatsangiz)
+  document.addEventListener('click', (e) => {
+    const openId = e.target?.getAttribute?.('data-open');
+    if (openId) {
+      const m = document.getElementById(openId);
+      if (m) m.classList.remove('hidden');
+    }
+    if (e.target?.hasAttribute?.('data-close')) {
+      e.target.closest('.modal')?.classList?.add('hidden');
+    }
+    if (e.target?.classList?.contains('modal')) {
+      e.target.classList.add('hidden');
+    }
+  });
 }
 
-// === (ixtiyoriy) foydali eksports ===
+// === (ixtiyoriy) kichik helper: adminligini sinxron tekshirish
 export const isAdminSync = () => {
   const prof = window.__mcUser?.profile;
   const num = Number(prof?.numericId);
   return Number.isFinite(num) && ADMIN_NUMERIC_IDS.includes(num);
 };
 
-// === Konsolga kichik banner (debug) ===
-try {
-  console.log('%cMathCenter common.js loaded', 'color:#0ea5e9;font-weight:bold');
-} catch {}
+// === Konsol banner (debug)
+try { console.log('%cMathCenter common.js loaded', 'color:#0ea5e9;font-weight:bold'); } catch {}
