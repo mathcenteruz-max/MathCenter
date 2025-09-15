@@ -1,5 +1,5 @@
-// common.js — MathCenter (mathcenter-1c98d) uchun
-// Firebase CDN + Google Redirect Auth + Auto Modal + Barqaror Sessiya
+// common.js — MathCenter (mathcenter-1c98d)
+// Firebase CDN + Google Redirect Auth + Auto Modal + Barqaror Sessiya (analytics yo‘q)
 
 // ==== Firebase CDN imports ====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -17,9 +17,6 @@ import {
   getFirestore,
   doc, getDoc, setDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import {
-  getAnalytics, isSupported as analyticsSupported
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-analytics.js";
 
 // ==== Firebase Config (MathCenter) ====
 export const firebaseConfig = {
@@ -37,14 +34,11 @@ export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
 
-// Sessiya qat'iy saqlansin (redirectdan keyin ham turib qolsin)
+// Sessiyaning qat’iy saqlanishi (redirectdan keyin ham user saqlansin)
 setPersistence(auth, browserLocalPersistence).catch(e=>{
   console.warn("[auth] setPersistence error:", e);
 });
 auth.useDeviceLanguage?.();
-
-// Analytics (ixtiyoriy)
-try { analyticsSupported().then(ok => { if (ok) getAnalytics(app); }); } catch {}
 
 // Admin numeric ID lar (ixtiyoriy)
 export const ADMIN_NUMERIC_IDS = [1000001, 1000002];
@@ -126,9 +120,9 @@ function publishUserReady(user, profile) {
 // === Auth UI
 /**
  * attachAuthUI({ requireSignIn?: boolean })
- * - Google redirect authni yoqadi
+ * - Google redirect auth
  * - User kirgach profilni yaratadi va mc:user-ready jo'natadi
- * - requireSignIn=true bo'lsa, foydalanuvchi chiqib turganda #authModal avtomatik ochiladi
+ * - requireSignIn=true bo'lsa, foydalanuvchi chiqib turganda modal avtomatik ochiladi
  */
 export function attachAuthUI(opts = {}) {
   const provider = new GoogleAuthProvider();
@@ -136,7 +130,7 @@ export function attachAuthUI(opts = {}) {
 
   const doRedirectSignIn = () => signInWithRedirect(auth, provider);
 
-  // Redirect natijasini ko'rish (xato bo'lsa ko'rsatamiz)
+  // Redirect natijasini ko'rsatish (xatolar ko'rinsin)
   getRedirectResult(auth)
     .then((cred) => {
       if (cred?.user) console.log("[auth] redirect OK:", cred.user.uid, cred.user.email);
@@ -159,9 +153,7 @@ export function attachAuthUI(opts = {}) {
         alert("Profilni yuklashda xato: " + (e.message || e));
       }
     } else {
-      // User chiqib turgan holat
       if (opts.requireSignIn) showAuthModal();
-      // Har safar ishonch uchun tugmalarni bog'lab qo'yamiz
       bindGoogleButtons(doRedirectSignIn);
     }
   });
@@ -174,7 +166,7 @@ export function attachAuthUI(opts = {}) {
 /**
  * initUX()
  * - [data-action="signout"] chiqish
- * - [data-action="signin-google"] fallback (agar alohida tugma bo'lsa)
+ * - [data-action="signin-google"] fallback
  * - [data-open="modalId"] / [data-close] modal boshqaruvi
  */
 export function initUX() {
@@ -224,4 +216,4 @@ export const isAdminSync = () => {
 };
 
 // === Konsol banner (debug)
-try { console.log("%cMathCenter common.js loaded", "color:#0ea5e9;font-weight:bold"); } catch {}
+try { console.log("%cMathCenter common.js loaded (no-analytics)", "color:#0ea5e9;font-weight:bold"); } catch {}
