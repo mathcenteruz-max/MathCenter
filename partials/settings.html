@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sozlamalar</title>
+  <link rel="stylesheet" href="./base.css"/>
+  <style>
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .status-badge { padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border-1); text-transform:capitalize; }
+    .status-pending { background:#fff8e1; }
+    .status-approved { background:#e8f5e9; }
+    .status-rejected { background:#ffebee; }
+    .adm-note { width:100%; min-height:64px; border:1px solid var(--border-1); border-radius:8px; padding:8px; }
+    .tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .tabs .btn.active { outline:2px solid var(--border-2); }
+    .hint.ok { color: #0a7b36; }
+    .hint.err { color: #b00020; }
+    .btn[disabled] { opacity:.6; cursor:not-allowed; }
+    .grid { display:grid; gap:10px; }
+    .card { border:1px solid var(--border-1,#ddd); border-radius:12px; padding:10px; }
+    .modal.hidden{ display:none; }
+    .modal .dialog{ background:#fff; border-radius:14px; margin:5svh auto; max-width:960px; padding:10px; border:1px solid #ddd; }
+    .modal{ position:fixed; inset:0; background:rgba(0,0,0,.32); padding:10px; }
+    .btn{ padding:8px 12px; border-radius:10px; border:1px solid #ddd; background:#f7f7f7; cursor:pointer; }
+    .btn.primary{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+    .btn.ghost{ background:#fff; }
+    .btn.danger{ background:#ef4444; color:#fff; border-color:#ef4444; }
+    .sub{ color:#555; font-size:.9rem; }
+    .pill{ display:inline-block; padding:4px 10px; border:1px solid #ddd; border-radius:999px; margin:2px; }
+    .form-grid{ display:grid; gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .field{ display:flex; flex-direction:column; gap:4px; }
+    .field input, .field select{ padding:8px; border-radius:8px; border:1px solid #ddd; }
+    .head{ display:flex; align-items:center; justify-content:space-between; }
+    .icon-btn{ border:none; background:transparent; font-size:22px; cursor:pointer; }
+    .method{ border:2px dashed #ddd; border-radius:12px; padding:10px; cursor:pointer; }
+    .method.active{ border-color:#0ea5e9; background:#f0f9ff; }
+
+    /* ===== Mobile tweaks ===== */
+    @media (max-width: 700px){
+      .form-grid{ grid-template-columns: 1fr !important; }
+      .tabs{ gap:6px; }
+      .btn{ width:100%; }
+      .head h3{ font-size:1.05rem; }
+      .modal .dialog{ max-width:none; margin:0; height:100svh; border-radius:0; }
+      .topup-layout{ grid-template-columns: 1fr !important; }
+      .card img{ height:auto; max-width:100%; }
+    }
+  </style>
+</head>
+<body>
+<h1>Sozlamalar</h1>
+
+<section class="grid">
+  <article class="card" id="cardProfile">
+    <h2>👤 Profil</h2>
+    <p class="sub">Shaxsiy ma’lumotlar</p>
+    <button class="btn ghost" data-open="profileModal">Ko‘rish</button>
+  </article>
+
+  <article class="card" id="cardResults">
+    <h2>📊 Natijalar</h2>
+    <p class="sub">So‘nggi 20 natija</p>
+    <button class="btn ghost" data-open="resultsModal">Ko‘rish</button>
+  </article>
+
+  <article class="card" id="cardBalance">
+    <h2>💳 Balans to‘ldirish</h2>
+    <p class="sub">CLICK / Xazna / P2P</p>
+    <button class="btn ghost" data-open="topUpModal">Ochish</button>
+  </article>
+
+  <article class="card" id="cardBadges">
+    <h2>🏆 Yutuqlar</h2>
+    <p class="sub">Badjlar</p>
+    <button class="btn ghost" data-open="badgesModal">Ko‘rish</button>
+  </article>
+
+  <article class="card" id="cardPromo">
+    <h2>🎁 Promo kod</h2>
+    <p class="sub">Bonus olish</p>
+    <button class="btn ghost" data-open="promoModal">Kiritish</button>
+  </article>
+
+  <article class="card" id="cardAdmin">
+    <h2>🛠️ Admin sahifa</h2>
+    <p class="sub">To‘lovlar / Users / Promo</p>
+    <button class="btn danger" id="openAdmin">Kirish</button>
+  </article>
+
+  <button class="btn" data-action="signout">Chiqish</button>
+</section>
+
+<!-- Profil -->
+<div class="modal hidden" id="profileModal">
+  <div class="dialog">
+    <div class="head">
+      <h3>Profil</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <form id="profileForm" class="form-grid">
+        <div class="field"><label>Numeric ID</label><input id="pf_numericId" type="text" readonly/></div>
+        <div class="field"><label>Ism</label><input id="pf_firstName" type="text"/></div>
+        <div class="field"><label>Familiya</label><input id="pf_lastName" type="text"/></div>
+        <div class="field"><label>Otasining ismi</label><input id="pf_middleName" type="text"/></div>
+        <div class="field"><label>Tug‘ilgan sana</label><input id="pf_dob" type="date"/></div>
+        <div class="field"><label>Viloyat</label><input id="pf_region" type="text"/></div>
+        <div class="field"><label>Tuman/Shahar</label><input id="pf_district" type="text"/></div>
+        <div class="field"><label>Telefon</label><input id="pf_phone" type="tel"/></div>
+        <div class="field"><label>💵 Balans</label><input id="pf_balance" type="number" readonly/></div>
+        <div class="field"><label>💎 Olmos</label><input id="pf_gems" type="number" readonly/></div>
+      </form>
+    </div>
+    <div class="foot">
+      <button id="profileEdit" class="btn">✏️ Tahrirlash</button>
+      <button id="profileSave" class="btn primary">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- Natijalar -->
+<div class="modal hidden" id="resultsModal">
+  <div class="dialog">
+    <div class="head">
+      <h3>Natijalar</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <div id="resultsList" class="grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Yutuqlar -->
+<div class="modal hidden" id="badgesModal">
+  <div class="dialog">
+    <div class="head">
+      <h3>Yutuqlar</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <div id="badgesWrap" class="grid" style="grid-template-columns:repeat(2,1fr)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Promo -->
+<div class="modal hidden" id="promoModal">
+  <div class="dialog">
+    <div class="head">
+      <h3>Promo kod</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <div style="display:flex;gap:8px">
+        <input id="promoInput" type="text" placeholder="Kodni kiriting"/>
+        <button id="promoApply" class="btn primary">Qo‘llash</button>
+      </div>
+      <p id="promoMsg" class="hint"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Admin: Tabs -->
+<div class="modal hidden" id="adminModal">
+  <div class="dialog" style="width:min(1100px,100%)">
+    <div class="head">
+      <h3>🛠️ Admin</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <div class="tabs">
+        <button class="btn ghost active" id="tabPayments">🧾 To‘lovlar</button>
+        <button class="btn ghost" id="tabUsers">👥 Users</button>
+        <button class="btn ghost" id="tabPromo">🎁 Promo</button>
+      </div>
+
+      <!-- PAYMENTS -->
+      <section id="panePayments">
+        <div class="row" style="margin-bottom:8px">
+          <button id="adm_pay_pending" class="btn primary">⏳ Yangi</button>
+          <button id="adm_pay_approved" class="btn ghost">✅ Qabul qilingan</button>
+          <button id="adm_pay_rejected" class="btn ghost">❌ Rad etilgan</button>
+          <button id="adm_pay_all" class="btn ghost">Hammasi</button>
+        </div>
+        <div id="adm_pay_table" class="grid"></div>
+      </section>
+
+      <!-- USERS -->
+      <section id="paneUsers" class="hidden">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="adm_query" type="text" placeholder="numericId yoki telefon"/>
+          <button id="adm_search" class="btn">Qidirish</button>
+          <button id="adm_list_all" class="btn ghost">Top 50</button>
+        </div>
+        <div id="adm_table" class="grid"></div>
+      </section>
+
+      <!-- PROMO -->
+      <section id="panePromo" class="hidden">
+        <h4 style="margin:6px 0 10px">Promo kod yaratish</h4>
+        <div class="form-grid">
+          <div class="field"><label>Kod</label><input id="pr_code" type="text" placeholder="MASALAX10"/></div>
+          <div class="field"><label>Balans + (so‘m)</label><input id="pr_balance" type="number" value="0"/></div>
+          <div class="field"><label>Olmos +</label><input id="pr_gems" type="number" value="0"/></div>
+          <div class="field"><label>Foizli skidka (%)</label><input id="pr_percent" type="number" value="0"/></div>
+          <div class="field"><label>Muddati (yyyy-mm-dd)</label><input id="pr_expires" type="date"/></div>
+          <div class="field"><label>Maks. ishlatish soni</label><input id="pr_max" type="number" value="1"/></div>
+          <div class="field"><label>Bir foydalanuvchiga limit</label><input id="pr_peruser" type="number" value="1"/></div>
+          <div class="field"><label>Faol</label>
+            <select id="pr_active">
+              <option value="true">Ha</option>
+              <option value="false">Yo‘q</option>
+            </select>
+          </div>
+        </div>
+        <div class="foot" style="justify-content:flex-start">
+          <button id="pr_create" class="btn primary">Yaratish</button>
+          <span id="pr_msg" class="sub"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- Top-up Modal -->
+<div class="modal hidden" id="topUpModal">
+  <div class="dialog" style="width:min(980px,100%)">
+    <div class="head">
+      <h3>💳 Balans to‘ldirish</h3>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="body">
+      <div class="grid topup-layout" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <!-- 1) To'lov usulini tanlash -->
+        <section class="card">
+          <h4 style="margin:0 0 8px">1) To‘lov usulini tanlang</h4>
+          <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <a class="btn primary method" data-method="CLICK" href="https://indoor.click.uz/pay?id=0081656&t=0" target="_blank" rel="noopener">CLICK — to‘lov</a>
+            <a class="btn method" data-method="XAZNA" href="https://pay.xazna.uz/p2p/f5edea87-06a5-4d48-a01d-885cf843eb8f" target="_blank" rel="noopener">Xazna — P2P</a>
+            <div class="card method" data-method="USSD" style="text-align:center">
+              <img src="./assets/Click QR kode.png" alt="CLICK QR/USSD" style="max-width:100%;border-radius:12px">
+              <div class="sub">USSD: <b>*880*081656*summa#</b></div>
+            </div>
+            <div class="card method" data-method="P2P" style="text-align:center">
+              <img src="./assets/Bank karta.png" alt="Karta P2P" style="max-width:100%;border-radius:12px">
+              <div class="sub"><b>Sattorov Sohibjon</b><br>4916 9903 0103 2469</div>
+            </div>
+          </div>
+          <p class="sub">Usulni bosganda to‘lov oynasi ochiladi. To‘lovni amalga oshirgach, pastdagi 2-qadamni bajaring.</p>
+        </section>
+
+        <!-- 2) To'lovni tasdiqlash -->
+        <section class="card">
+          <h4 style="margin:0 0 8px">2) To‘lovni tasdiqlash</h4>
+          <div class="form-grid">
+            <div class="field"><label>Tanlangan usul</label><input id="pay_method_view" type="text" placeholder="Avval usulni tanlang" readonly></div>
+            <div class="field"><label>Summasi (so‘m)</label><input id="pay_amount" type="number" min="1000" step="1000" placeholder="10000"></div>
+            <div class="field"><label>💳 Karta (oxirgi 4 ta)</label><input id="pay_card" type="text" inputmode="numeric" maxlength="19" placeholder="1234"></div>
+            <div class="field"><label>Izoh (ixtiyoriy)</label><input id="pay_note" type="text" placeholder="To‘lov maqsadi"></div>
+          </div>
+          <p class="sub">Ma’lumotlaringiz admin panelga yuboriladi. Telegramga faqat matnli bildirishnoma boradi.</p>
+          <div class="foot" style="justify-content:flex-start">
+            <button id="pay_submit" class="btn primary">Yuborish</button>
+            <span id="pay_msg" class="hint"></span>
+          </div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:12px">
+        <h4 style="margin:0 0 8px">To‘ldirishlar tarixi</h4>
+        <div id="pay_history" class="grid"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- cache-bust -->
+<script type="module" src="./settings.js?v=45"></script>
+</body>
+</html>
