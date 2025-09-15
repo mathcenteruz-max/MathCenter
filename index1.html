@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MathCenter.uz — Eng Zo'r Math Center</title>
+
+  <!-- UI styles -->
+  <link rel="stylesheet" href="./css/base.css"/>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="./assets/favicon.png">
+
+  <style>
+    /* Auth modal uchun minimal zarur stillar */
+    .hidden { display: none !important; }
+    .modal  { position: fixed; inset: 0; background: rgba(0,0,0,.32); z-index: 1000; padding: 10px; }
+    /* Header/pill ko‘rinishi (zarur bo‘lsa) */
+    .pill { padding: 6px 10px; border-radius: 999px; background: #eef6ff; color:#0369a1; font-weight:600; font-size:.9rem; }
+    .btn  { border:1px solid #0ea5e9; background:#0ea5e9; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    .btn.primary { background:#0ea5e9; }
+    .icon-btn { background:transparent; border:none; cursor:pointer; font-size:1.1rem; }
+    .mc-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .mc-header .nav a { margin:0 6px; text-decoration:none; color:#111827; }
+    .container { max-width:1100px; margin:0 auto; padding:16px; }
+    .mc-footer { border-top:1px solid #e5e7eb; background:#fafafa; }
+    .mc-footer .container { padding:16px; color:#6b7280; font-size:.9rem; display:flex; gap:16px; flex-wrap:wrap; }
+    .brand img { height:32px; }
+    @media (max-width: 768px){
+      .desktop-nav { display:none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="mc-header">
+    <div class="mc-left">
+      <div class="brand">
+        <img src="./assets/logo.svg" alt="MathCenter" />
+      </div>
+    </div>
+
+    <nav class="nav desktop-nav">
+      <a href="#home">🏠 Bosh sahifa</a>
+      <a href="#tests">📝 Testlar</a>
+      <a href="#courses">📚 Kurslar</a>
+      <a href="#live">🔥 Live</a>
+      <a href="#simulator">🎮 Simulator</a>
+      <a href="#leaderboard">🏅 Reyting</a>
+      <a href="#settings">⚙️ Sozlamalar</a>
+    </nav>
+
+    <div class="mc-right" style="display:flex;align-items:center;gap:8px;">
+      <button id="btnTheme" class="icon-btn" title="Kun/Tun">🌙</button>
+      <span id="hdrId"  class="pill">ID: —</span>
+      <span id="hdrBal" class="pill">💵 0</span>
+      <span id="hdrGem" class="pill">💎 0</span>
+      <!-- .google-signin -> common.js avtomatik bog'laydi -->
+      <button id="btnSignIn" class="btn primary google-signin">Kirish</button>
+      <button class="btn" data-action="signout" style="display:none" id="btnSignOut">Chiqish</button>
+    </div>
+  </header>
+
+  <main class="container" id="app">
+    <!-- router.js shu #app ichiga sahifalarni yuklaydi -->
+  </main>
+
+  <footer class="mc-footer">
+    <div class="container">
+      <div class="sub">© 2025 MathCenter v4 — tests + live + real-time</div>
+      <div class="sub">Dizayn: mobil-first, yashil tema.</div>
+    </div>
+  </footer>
+
+  <!-- Modullarni yuklash -->
+  <script type="module" src="./js/common.js"></script>
+  <script type="module" src="./js/router.js"></script>
+
+  <!-- Auth/UX ni ishga tushirish -->
+  <script type="module">
+    import { attachAuthUI, initUX } from './js/common.js';
+
+    // Foydalanuvchi chiqib turganda modal avtomatik ochilsin
+    attachAuthUI({ requireSignIn: true });
+    initUX();
+
+    // Kirgandan keyin header qiymatlarni yangilash
+    document.addEventListener('mc:user-ready', (e) => {
+      const { user, profile } = e.detail || {};
+      const idEl  = document.getElementById('hdrId');
+      const balEl = document.getElementById('hdrBal');
+      const gemEl = document.getElementById('hdrGem');
+      const outBtn = document.getElementById('btnSignOut');
+      const inBtn  = document.getElementById('btnSignIn');
+
+      if (user && profile) {
+        idEl.textContent  = `ID: ${profile.numericId ?? '—'}`;
+        balEl.textContent = `💵 ${profile.balance ?? 0}`;
+        gemEl.textContent = `💎 ${profile.gems ?? 0}`;
+        if (outBtn) outBtn.style.display = 'inline-flex';
+        if (inBtn)  inBtn.style.display  = 'none';
+      } else {
+        idEl.textContent  = 'ID: —';
+        balEl.textContent = '💵 0';
+        gemEl.textContent = '💎 0';
+        if (outBtn) outBtn.style.display = 'none';
+        if (inBtn)  inBtn.style.display  = 'inline-flex';
+      }
+    });
+  </script>
+  <script type="module">
+  import { attachAuthUI, initUX } from './js/common.js';
+  attachAuthUI({ requireSignIn: true });
+  initUX();
+</script>
+</body>
+</html>
