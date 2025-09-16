@@ -20,7 +20,7 @@ import {
 
 // ==== Firebase Config (MathCenter) ====
 export const firebaseConfig = {
-  apiKey: "AIzaSyDpokm9FepnLQhpZADRxZnHtOfggdOnbVk",
+  apiKey: "AIzaSyAfoJhkSOqGvKWsIvGCi-OZ0sK2qLrnaGE",
   authDomain: "mathcenter-1c98d.firebaseapp.com",
   projectId: "mathcenter-1c98d",
   storageBucket: "mathcenter-1c98d.appspot.com", // MUHIM: appspot.com

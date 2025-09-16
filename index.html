@@ -1,122 +1,115 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="uz">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Firebase Auth — Minimal test</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MathCenter.uz — Eng Zo'r Math Center</title>
+
+  <!-- UI styles -->
+  <link rel="stylesheet" href="./css/base.css"/>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="./assets/favicon.png">
+
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f8fafc;color:#0f172a}
-    main{max-width:640px;margin:40px auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .btn{border:1px solid #0ea5e9;background:#0ea5e9;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
-    .ghost{background:#fff;color:#0ea5e9}
-    code{background:#f1f5f9;padding:2px 6px;border-radius:6px}
-    #log{white-space:pre-wrap;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#334155;margin-top:8px}
+    /* Auth modal uchun minimal zarur stillar */
+    .hidden { display: none !important; }
+    .modal  { position: fixed; inset: 0; background: rgba(0,0,0,.32); z-index: 1000; padding: 10px; }
+    /* Header/pill ko‘rinishi (zarur bo‘lsa) */
+    .pill { padding: 6px 10px; border-radius: 999px; background: #eef6ff; color:#0369a1; font-weight:600; font-size:.9rem; }
+    .btn  { border:1px solid #0ea5e9; background:#0ea5e9; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    .btn.primary { background:#0ea5e9; }
+    .icon-btn { background:transparent; border:none; cursor:pointer; font-size:1.1rem; }
+    .mc-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .mc-header .nav a { margin:0 6px; text-decoration:none; color:#111827; }
+    .container { max-width:1100px; margin:0 auto; padding:16px; }
+    .mc-footer { border-top:1px solid #e5e7eb; background:#fafafa; }
+    .mc-footer .container { padding:16px; color:#6b7280; font-size:.9rem; display:flex; gap:16px; flex-wrap:wrap; }
+    .brand img { height:32px; }
+    @media (max-width: 768px){
+      .desktop-nav { display:none; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Firebase Auth — Minimal test</h1>
-
-    <div class="card">
-      <div class="row"><strong>Holat:</strong> <span id="state">Boshlanmoqda…</span></div>
-      <div class="row" style="margin-top:10px">
-        <button id="btnSignIn"  class="btn">Google bilan kirish</button>
-        <button id="btnSignOut" class="btn ghost" style="display:none">Chiqish</button>
+  <header class="mc-header">
+    <div class="mc-left">
+      <div class="brand">
+        <img src="./assets/logo.svg" alt="MathCenter" />
       </div>
-      <hr style="margin:12px 0;border:none;border-top:1px dashed #cbd5e1">
-      <div><strong>Foydalanuvchi:</strong> <code id="who">—</code></div>
-      <div id="log"></div>
     </div>
 
-    <p style="margin-top:16px;color:#64748b">
-      <strong>Eslatma:</strong> Agar bu sahifa ishlamasa, quyidagilarni tekshiring:
-      Authorized domains (Netlify domeningiz), Google provider Enabled, API key to‘g‘ri loyihaniki, va sahifa <code>https</code> da.
-    </p>
+    <nav class="nav desktop-nav">
+      <a href="#home">🏠 Bosh sahifa</a>
+      <a href="#tests">📝 Testlar</a>
+      <a href="#courses">📚 Kurslar</a>
+      <a href="#live">🔥 Live</a>
+      <a href="#simulator">🎮 Simulator</a>
+      <a href="#leaderboard">🏅 Reyting</a>
+      <a href="#settings">⚙️ Sozlamalar</a>
+    </nav>
+
+    <div class="mc-right" style="display:flex;align-items:center;gap:8px;">
+      <button id="btnTheme" class="icon-btn" title="Kun/Tun">🌙</button>
+      <span id="hdrId"  class="pill">ID: —</span>
+      <span id="hdrBal" class="pill">💵 0</span>
+      <span id="hdrGem" class="pill">💎 0</span>
+      <!-- .google-signin -> common.js avtomatik bog'laydi -->
+      <button id="btnSignIn" class="btn primary google-signin">Kirish</button>
+      <button class="btn" data-action="signout" style="display:none" id="btnSignOut">Chiqish</button>
+    </div>
+  </header>
+
+  <main class="container" id="app">
+    <!-- router.js shu #app ichiga sahifalarni yuklaydi -->
   </main>
 
-  <!-- BARCHASI BITTA MODUL BLOKDA -->
+  <footer class="mc-footer">
+    <div class="container">
+      <div class="sub">© 2025 MathCenter v4 — tests + live + real-time</div>
+      <div class="sub">Dizayn: mobil-first, yashil tema.</div>
+    </div>
+  </footer>
+
+  <!-- Modullarni yuklash -->
+  <script type="module" src="./js/common.js"></script>
+  <script type="module" src="./js/router.js"></script>
+
+  <!-- Auth/UX ni ishga tushirish -->
   <script type="module">
-    // ---- Firebase CDN importlari
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-    import {
-      getAuth, onAuthStateChanged, GoogleAuthProvider,
-      signInWithRedirect, getRedirectResult, signOut,
-      setPersistence, browserLocalPersistence
-    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, serverTimestamp }
-      from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { attachAuthUI, initUX } from './js/common.js';
 
-    // ---- CONFIG (MathCenter). Xohlasangiz o'zingizning project config'ni qo'ying.
-    const firebaseConfig = {
-      apiKey: "AIzaSyAfoJhkSOqGvKWsIvGCi-OZ0sK2qLrnaGE",
-      authDomain: "mathcenter-1c98d.firebaseapp.com",
-      projectId: "mathcenter-1c98d",
-      storageBucket: "mathcenter-1c98d.appspot.com",
-      messagingSenderId: "1016417719928",
-      appId: "1:1016417719928:web:700b028da1312477c87f8d",
-      measurementId: "G-JEECME5HMJ"
-    };
+    // Foydalanuvchi chiqib turganda modal avtomatik ochilsin
+    attachAuthUI({ requireSignIn: true });
+    initUX();
 
-    // ---- UI yordamchilari
-    const $ = (s)=>document.querySelector(s);
-    const logDiv = $("#log");
-    const log = (...a)=>{ console.log(...a); logDiv.textContent += a.map(x=>typeof x==="object"?JSON.stringify(x):String(x)).join(" ") + "\n"; };
+    // Kirgandan keyin header qiymatlarni yangilash
+    document.addEventListener('mc:user-ready', (e) => {
+      const { user, profile } = e.detail || {};
+      const idEl  = document.getElementById('hdrId');
+      const balEl = document.getElementById('hdrBal');
+      const gemEl = document.getElementById('hdrGem');
+      const outBtn = document.getElementById('btnSignOut');
+      const inBtn  = document.getElementById('btnSignIn');
 
-    // ---- Init
-    const app  = initializeApp(firebaseConfig);
-    const db   = getFirestore(app);
-    const auth = getAuth(app);
-    await setPersistence(auth, browserLocalPersistence).catch(e=>log("[setPersistence]", e.code||e.message));
-    auth.useDeviceLanguage?.();
-
-    // ---- Redirect natijasini ko'rish (xatolar ko'rinsin)
-    getRedirectResult(auth)
-      .then(cred => { if (cred?.user) log("[redirect OK]", cred.user.email); })
-      .catch(e => { alert("Kirish xatosi: " + (e.code || e.message)); log("[redirect error]", e); });
-
-    // ---- Auth holati
-    onAuthStateChanged(auth, async (user) => {
-      log("[state]", Boolean(user), user?.email || "");
-      if (user) {
-        $("#state").textContent = "Kirdingiz";
-        $("#who").textContent   = user.email || user.uid;
-        $("#btnSignIn").style.display  = "none";
-        $("#btnSignOut").style.display = "inline-flex";
-
-        // ixtiyoriy: profil hujjati bor-yo'qligini tekshiramiz
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          await setDoc(ref, {
-            uid: user.uid,
-            email: user.email || null,
-            createdAtFS: serverTimestamp()
-          }, { merge: true });
-          log("[profile] created");
-        } else {
-          log("[profile] exists");
-        }
+      if (user && profile) {
+        idEl.textContent  = `ID: ${profile.numericId ?? '—'}`;
+        balEl.textContent = `💵 ${profile.balance ?? 0}`;
+        gemEl.textContent = `💎 ${profile.gems ?? 0}`;
+        if (outBtn) outBtn.style.display = 'inline-flex';
+        if (inBtn)  inBtn.style.display  = 'none';
       } else {
-        $("#state").textContent = "Chiqib turibsiz";
-        $("#who").textContent   = "—";
-        $("#btnSignIn").style.display  = "inline-flex";
-        $("#btnSignOut").style.display = "none";
+        idEl.textContent  = 'ID: —';
+        balEl.textContent = '💵 0';
+        gemEl.textContent = '💎 0';
+        if (outBtn) outBtn.style.display = 'none';
+        if (inBtn)  inBtn.style.display  = 'inline-flex';
       }
     });
-
-    // ---- Tugmalar
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-
-    $("#btnSignIn").addEventListener("click", (e)=>{
-      e.preventDefault();
-      signInWithRedirect(auth, provider);
-    });
-    $("#btnSignOut").addEventListener("click", async ()=>{
-      try { await signOut(auth); } catch(e){ alert("Chiqishda xato: " + (e.code||e.message)); }
-    });
   </script>
+  <script type="module">
+  import { attachAuthUI, initUX } from './js/common.js';
+  attachAuthUI({ requireSignIn: true });
+  initUX();
+</script>
 </body>
 </html>
